@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   authors: [{ name: "GOOD Лак" }],
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
   openGraph: {
     title: "GOOD Лак - Студия маникюра",
@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/logo.svg",
-        width: 400,
-        height: 150,
+        url: "/logo.png",
+        width: 512,
+        height: 512,
         alt: "GOOD Лак - Студия маникюра",
       },
     ],
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "GOOD Лак - Студия маникюра",
     description: "Запишитесь на маникюр в GOOD Лак",
-    images: ["/logo.svg"],
+    images: ["/logo.png"],
   },
   appleWebApp: {
     capable: true,
@@ -64,7 +64,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="GOOD Лак" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="apple-touch-icon" href="/icon.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
