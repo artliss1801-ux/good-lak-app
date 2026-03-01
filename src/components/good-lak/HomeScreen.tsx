@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CalendarDays, ClipboardList, LogOut, User, Settings } from 'lucide-react';
 import { useGoodLakStore } from '@/store/good-lak-store';
-import { Logo } from './Logo';
 
 export function HomeScreen() {
   const { user, setScreen, logout } = useGoodLakStore();
@@ -14,8 +13,12 @@ export function HomeScreen() {
       {/* Header с логотипом */}
       <header className="bg-gradient-to-r from-pink-500 to-cyan-500 p-4 shadow-lg">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          <div className="h-10 w-32">
-            <Logo size="sm" />
+          <div className="h-10 w-auto">
+            <img 
+              src="/logo.png" 
+              alt="GOOD Лак" 
+              className="h-10 w-auto object-contain"
+            />
           </div>
           <div className="flex items-center gap-2">
             <button
