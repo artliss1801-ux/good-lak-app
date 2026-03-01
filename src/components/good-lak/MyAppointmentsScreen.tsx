@@ -162,12 +162,23 @@ export function MyAppointmentsScreen() {
   };
 
   const today = new Date().toISOString().split('T')[0]; // yyyy-MM-dd
-  const upcomingAppointments = appointments.filter(
-    a => a.date >= today && a.status !== 'Отменено'
-  );
-  const pastAppointments = appointments.filter(
-    a => a.date < today || a.status === 'Отменено'
-  );
+  
+  // Сортировка записей по дате и времени
+  const sortAppointments = (a: Appointment, b: Appointment) => {
+    // Сначала по дате
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    // Если даты одинаковые - по времени
+    return a.time.localeCompare(b.time);
+  };
+  
+  const upcomingAppointments = appointments
+    .filter(a => a.date >= today && a.status !== 'Отменено')
+    .sort(sortAppointments); // По возрастанию - ближайшие сначала
+  
+  const pastAppointments = appointments
+    .filter(a => a.date < today || a.status === 'Отменено')
+    .sort((a, b) => sortAppointments(b, a)); // По убыванию - недавние сначала
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-pink-50 via-white to-cyan-50">
