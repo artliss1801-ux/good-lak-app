@@ -17,9 +17,33 @@ import {
   Loader2,
   Save,
   Code,
-  Server
+  Server,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check
 } from 'lucide-react';
 import { useGoodLakStore } from '@/store/good-lak-store';
+
+interface Service {
+  id: number;
+  name: string;
+  price: number;
+  duration: number;
+  description: string;
+  active: boolean;
+}
+
+interface Master {
+  id: number;
+  name: string;
+  photo: string;
+  telegramId: string;
+  login: string;
+  password: string;
+  active: boolean;
+}
 
 export function DeveloperScreen() {
   const { developer, developerLogout } = useGoodLakStore();
@@ -36,9 +60,29 @@ export function DeveloperScreen() {
   });
   const [saveMessage, setSaveMessage] = useState('');
 
+  // Услуги
+  const [services, setServices] = useState<Service[]>([]);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [isAddingService, setIsAddingService] = useState(false);
+  const [newService, setNewService] = useState({ name: '', price: 0, duration: 60, description: '' });
+
+  // Мастера
+  const [masters, setMasters] = useState<Master[]>([]);
+  const [editingMaster, setEditingMaster] = useState<Master | null>(null);
+  const [isAddingMaster, setIsAddingMaster] = useState(false);
+  const [newMaster, setNewMaster] = useState({ name: '', photo: '', telegramId: '', login: '', password: '' });
+
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (activeSection === 'services') {
+      loadServices();
+    } else if (activeSection === 'masters') {
+      loadMasters();
+    }
+  }, [activeSection]);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -82,13 +126,203 @@ export function DeveloperScreen() {
     }
   };
 
+  // ==================== УСЛУГИ ====================
+
+  const loadServices = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak?action=getAllServices');
+      const data = await response.json();
+      if (data.success) {
+        setServices(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading services:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddService = async () => {
+    if (!newService.name.trim()) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addService',
+          service: newService
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setServices([...services, data.data]);
+        setNewService({ name: '', price: 0, duration: 60, description: '' });
+        setIsAddingService(false);
+      }
+    } catch (error) {
+      console.error('Error adding service:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateService = async (service: Service) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateService',
+          serviceId: service.id,
+          service: {
+            name: service.name,
+            price: service.price,
+            duration: service.duration,
+            description: service.description,
+            active: service.active
+          }
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setServices(services.map(s => s.id === service.id ? service : s));
+        setEditingService(null);
+      }
+    } catch (error) {
+      console.error('Error updating service:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteService = async (serviceId: number) => {
+    if (!confirm('Удалить услугу?')) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteService',
+          serviceId: serviceId
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setServices(services.filter(s => s.id !== serviceId));
+      }
+    } catch (error) {
+      console.error('Error deleting service:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ==================== МАСТЕРА ====================
+
+  const loadMasters = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak?action=getAllMasters');
+      const data = await response.json();
+      if (data.success) {
+        setMasters(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading masters:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddMaster = async () => {
+    if (!newMaster.name.trim()) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addMaster',
+          master: newMaster
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMasters([...masters, data.data]);
+        setNewMaster({ name: '', photo: '', telegramId: '', login: '', password: '' });
+        setIsAddingMaster(false);
+      }
+    } catch (error) {
+      console.error('Error adding master:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateMaster = async (master: Master) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateMasterByAdmin',
+          masterId: master.id,
+          master: {
+            name: master.name,
+            photo: master.photo,
+            telegramId: master.telegramId,
+            login: master.login,
+            password: master.password,
+            active: master.active
+          }
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMasters(masters.map(m => m.id === master.id ? master : m));
+        setEditingMaster(null);
+      }
+    } catch (error) {
+      console.error('Error updating master:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteMaster = async (masterId: number) => {
+    if (!confirm('Удалить мастера?')) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/good-lak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteMaster',
+          masterId: masterId
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMasters(masters.filter(m => m.id !== masterId));
+      }
+    } catch (error) {
+      console.error('Error deleting master:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const menuItems = [
     { id: 'settings', title: 'Настройки приложения', icon: Settings, description: 'Название, цвета, логотип' },
     { id: 'database', title: 'База данных', icon: Database, description: 'Google Sheets, Drive' },
     { id: 'admins', title: 'Администраторы', icon: Users, description: 'Управление доступом' },
     { id: 'services', title: 'Услуги', icon: DollarSign, description: 'Список услуг и цен' },
     { id: 'masters', title: 'Мастера', icon: Calendar, description: 'Управление мастерами' },
-    { id: 'logs', title: 'Логи системы', icon: Code, description: 'Просмотр логов' },
   ];
 
   if (activeSection !== 'main') {
@@ -114,7 +348,7 @@ export function DeveloperScreen() {
           </div>
         </header>
 
-        <div className="flex-1 p-4 max-w-md mx-auto w-full">
+        <div className="flex-1 p-4 max-w-md mx-auto w-full overflow-auto">
           {activeSection === 'settings' && (
             <div className="space-y-4">
               <Card className="border-0 shadow-lg bg-gray-800">
@@ -299,60 +533,352 @@ export function DeveloperScreen() {
 
           {activeSection === 'services' && (
             <div className="space-y-4">
-              <Card className="border-0 shadow-lg bg-gray-800">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-white mb-3">Управление услугами</h3>
-                  <p className="text-gray-400 text-sm mb-4">
-                    Услуги настраиваются в Google таблице на листе "Услуги".
-                  </p>
-                  <Button 
-                    onClick={() => window.open('https://docs.google.com/spreadsheets/d/', '_blank')}
-                    variant="outline"
-                    className="w-full border-gray-600 text-gray-300"
-                  >
-                    Открыть таблицу
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* Кнопка добавления */}
+              {!isAddingService && (
+                <Button 
+                  onClick={() => setIsAddingService(true)}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Добавить услугу
+                </Button>
+              )}
+
+              {/* Форма добавления */}
+              {isAddingService && (
+                <Card className="border-0 shadow-lg bg-gray-800">
+                  <CardContent className="p-4 space-y-3">
+                    <h3 className="font-semibold text-white">Новая услуга</h3>
+                    <Input
+                      placeholder="Название услуги"
+                      value={newService.name}
+                      onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-400">Цена (руб)</label>
+                        <Input
+                          type="number"
+                          value={newService.price}
+                          onChange={(e) => setNewService({ ...newService, price: Number(e.target.value) })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Длительность (мин)</label>
+                        <Input
+                          type="number"
+                          value={newService.duration}
+                          onChange={(e) => setNewService({ ...newService, duration: Number(e.target.value) })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                      </div>
+                    </div>
+                    <Input
+                      placeholder="Описание (необязательно)"
+                      value={newService.description}
+                      onChange={(e) => setNewService({ ...newService, description: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleAddService}
+                        disabled={isLoading || !newService.name.trim()}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          setIsAddingService(false);
+                          setNewService({ name: '', price: 0, duration: 60, description: '' });
+                        }}
+                        variant="outline"
+                        className="flex-1 border-gray-600 text-gray-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Список услуг */}
+              {services.map(service => (
+                <Card key={service.id} className={`border-0 shadow-lg ${service.active ? 'bg-gray-800' : 'bg-gray-900 opacity-60'}`}>
+                  <CardContent className="p-4">
+                    {editingService?.id === service.id ? (
+                      <div className="space-y-3">
+                        <Input
+                          value={editingService.name}
+                          onChange={(e) => setEditingService({ ...editingService, name: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-gray-400">Цена</label>
+                            <Input
+                              type="number"
+                              value={editingService.price}
+                              onChange={(e) => setEditingService({ ...editingService, price: Number(e.target.value) })}
+                              className="bg-gray-700 border-gray-600 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400">Длит.</label>
+                            <Input
+                              type="number"
+                              value={editingService.duration}
+                              onChange={(e) => setEditingService({ ...editingService, duration: Number(e.target.value) })}
+                              className="bg-gray-700 border-gray-600 text-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => handleUpdateService(editingService)}
+                            disabled={isLoading}
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            onClick={() => setEditingService(null)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 border-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-white font-medium">{service.name}</h3>
+                            {!service.active && (
+                              <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded">неактивна</span>
+                            )}
+                          </div>
+                          <p className="text-gray-400 text-sm">
+                            {service.price} руб • {service.duration} мин
+                          </p>
+                          {service.description && (
+                            <p className="text-gray-500 text-xs mt-1">{service.description}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setEditingService(service)}
+                            className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600"
+                          >
+                            <Pencil className="h-4 w-4 text-gray-300" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(service.id)}
+                            className="p-2 rounded-lg bg-gray-700 hover:bg-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-300" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+
+              {services.length === 0 && !isLoading && (
+                <p className="text-center text-gray-400 py-8">Нет услуг</p>
+              )}
             </div>
           )}
 
           {activeSection === 'masters' && (
             <div className="space-y-4">
-              <Card className="border-0 shadow-lg bg-gray-800">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-white mb-3">Управление мастерами</h3>
-                  <p className="text-gray-400 text-sm mb-4">
-                    Мастера настраиваются в Google таблице на листе "Мастера".
-                  </p>
-                  <Button 
-                    onClick={() => window.open('https://docs.google.com/spreadsheets/d/', '_blank')}
-                    variant="outline"
-                    className="w-full border-gray-600 text-gray-300"
-                  >
-                    Открыть таблицу
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+              {/* Кнопка добавления */}
+              {!isAddingMaster && (
+                <Button 
+                  onClick={() => setIsAddingMaster(true)}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Добавить мастера
+                </Button>
+              )}
 
-          {activeSection === 'logs' && (
-            <div className="space-y-4">
-              <Card className="border-0 shadow-lg bg-gray-800">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-white mb-3">Системные логи</h3>
-                  <p className="text-gray-400 text-sm">
-                    Логи доступны в консоли Apps Script и в логах сервера.
-                  </p>
-                  <pre className="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-400 overflow-auto">
-                    {`// Проверьте логи в:
-// 1. Apps Script Dashboard
-// 2. Серверные логи (Vercel/другой хостинг)
-// 3. Browser Console (F12)`}
-                  </pre>
-                </CardContent>
-              </Card>
+              {/* Форма добавления */}
+              {isAddingMaster && (
+                <Card className="border-0 shadow-lg bg-gray-800">
+                  <CardContent className="p-4 space-y-3">
+                    <h3 className="font-semibold text-white">Новый мастер</h3>
+                    <Input
+                      placeholder="Имя мастера *"
+                      value={newMaster.name}
+                      onChange={(e) => setNewMaster({ ...newMaster, name: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <Input
+                      placeholder="URL фото"
+                      value={newMaster.photo}
+                      onChange={(e) => setNewMaster({ ...newMaster, photo: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <Input
+                      placeholder="Telegram ID"
+                      value={newMaster.telegramId}
+                      onChange={(e) => setNewMaster({ ...newMaster, telegramId: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <Input
+                      placeholder="Логин"
+                      value={newMaster.login}
+                      onChange={(e) => setNewMaster({ ...newMaster, login: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <Input
+                      placeholder="Пароль"
+                      value={newMaster.password}
+                      onChange={(e) => setNewMaster({ ...newMaster, password: e.target.value })}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleAddMaster}
+                        disabled={isLoading || !newMaster.name.trim()}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          setIsAddingMaster(false);
+                          setNewMaster({ name: '', photo: '', telegramId: '', login: '', password: '' });
+                        }}
+                        variant="outline"
+                        className="flex-1 border-gray-600 text-gray-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Список мастеров */}
+              {masters.map(master => (
+                <Card key={master.id} className={`border-0 shadow-lg ${master.active ? 'bg-gray-800' : 'bg-gray-900 opacity-60'}`}>
+                  <CardContent className="p-4">
+                    {editingMaster?.id === master.id ? (
+                      <div className="space-y-3">
+                        <Input
+                          placeholder="Имя"
+                          value={editingMaster.name}
+                          onChange={(e) => setEditingMaster({ ...editingMaster, name: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Input
+                          placeholder="URL фото"
+                          value={editingMaster.photo}
+                          onChange={(e) => setEditingMaster({ ...editingMaster, photo: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Input
+                          placeholder="Telegram ID"
+                          value={editingMaster.telegramId}
+                          onChange={(e) => setEditingMaster({ ...editingMaster, telegramId: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Input
+                          placeholder="Логин"
+                          value={editingMaster.login}
+                          onChange={(e) => setEditingMaster({ ...editingMaster, login: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Input
+                          placeholder="Пароль"
+                          value={editingMaster.password}
+                          onChange={(e) => setEditingMaster({ ...editingMaster, password: e.target.value })}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={editingMaster.active}
+                            onChange={(e) => setEditingMaster({ ...editingMaster, active: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span className="text-gray-300 text-sm">Активен</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => handleUpdateMaster(editingMaster)}
+                            disabled={isLoading}
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            onClick={() => setEditingMaster(null)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 border-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="h-12 w-12 rounded-full bg-pink-600 flex items-center justify-center overflow-hidden">
+                            {master.photo ? (
+                              <img src={master.photo} alt={master.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-white font-bold text-lg">{master.name?.charAt(0) || '?'}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-white font-medium">{master.name}</h3>
+                              {!master.active && (
+                                <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded">неактивен</span>
+                              )}
+                            </div>
+                            <p className="text-gray-400 text-sm">
+                              {master.login || 'Нет логина'}
+                            </p>
+                            {master.telegramId && (
+                              <p className="text-gray-500 text-xs">TG: {master.telegramId}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setEditingMaster(master)}
+                            className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600"
+                          >
+                            <Pencil className="h-4 w-4 text-gray-300" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMaster(master.id)}
+                            className="p-2 rounded-lg bg-gray-700 hover:bg-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-300" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+
+              {masters.length === 0 && !isLoading && (
+                <p className="text-center text-gray-400 py-8">Нет мастеров</p>
+              )}
             </div>
           )}
         </div>
