@@ -736,7 +736,13 @@ function getServices() {
   const services = data
     .filter(s => {
       const active = s['Активна'];
-      return active !== 0 && active !== false && active !== '0';
+      // Услуга активна если: значение не 0, не false, не '0', не 'false'
+      // Пустое значение, null, undefined считаются активными (по умолчанию)
+      if (active === 0 || active === false || active === '0' || active === 'false' || active === 'FALSE') {
+        return false;
+      }
+      // У услуги должно быть название
+      return s['Название'] && String(s['Название']).trim() !== '';
     })
     .map(s => ({
       id: s['ID'],
@@ -744,7 +750,7 @@ function getServices() {
       price: s['Цена'] || 0,
       duration: s['Длительность'] || 60,
       description: s['Описание'] || '',
-      active: s['Активна'] === 1 || s['Активна'] === true || s['Активна'] === '1' || s['Активна'] === 'true'
+      active: s['Активна'] !== 0 && s['Активна'] !== false && s['Активна'] !== '0' && s['Активна'] !== 'false'
     }));
   
   return { success: true, data: services };
@@ -855,6 +861,33 @@ function deleteService(serviceId) {
   }
   
   return { success: false, error: 'Услуга не найдена' };
+}
+
+// Функция для отладки - показать все услуги с их статусами
+function debugServices() {
+  const data = getSheetData(CONFIG.SHEETS.SERVICES);
+  console.log('=== DEBUG: Services Data ===');
+  console.log('Total rows:', data.length);
+  
+  data.forEach((s, idx) => {
+    console.log(`Row ${idx + 1}:`, {
+      ID: s['ID'],
+      Название: s['Название'],
+      Активна: s['Активна'],
+      'Тип Активна': typeof s['Активна'],
+      'Активна raw': JSON.stringify(s['Активна'])
+    });
+  });
+  
+  return {
+    success: true,
+    data: data.map(s => ({
+      id: s['ID'],
+      name: s['Название'],
+      active: s['Активна'],
+      activeType: typeof s['Активна']
+    }))
+  };
 }
 
 // ==================== МАСТЕРА (для разработчика) ====================
