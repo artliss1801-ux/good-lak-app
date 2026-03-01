@@ -45,6 +45,36 @@ interface Master {
   active: boolean;
 }
 
+// Функция для проксирования Google Drive изображений
+function extractGoogleDriveFileId(url: string): string | null {
+  if (!url) return null;
+  
+  // Паттерны для Google Drive URL
+  const patterns = [
+    /\/d\/([a-zA-Z0-9_-]+)/,  // /d/FILE_ID
+    /id=([a-zA-Z0-9_-]+)/,     // ?id=FILE_ID
+    /open\?id=([a-zA-Z0-9_-]+)/, // open?id=FILE_ID
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+}
+
+function getProxiedImageUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  const fileId = extractGoogleDriveFileId(url);
+  if (fileId) {
+    return `/api/image-proxy?id=${fileId}`;
+  }
+  return url;
+}
+
 export function DeveloperScreen() {
   const { developer, developerLogout } = useGoodLakStore();
   const [activeSection, setActiveSection] = useState<string>('main');
@@ -836,7 +866,7 @@ export function DeveloperScreen() {
                         <div className="flex items-center gap-3 flex-1">
                           <div className="h-12 w-12 rounded-full bg-pink-600 flex items-center justify-center overflow-hidden">
                             {master.photo ? (
-                              <img src={master.photo} alt={master.name} className="w-full h-full object-cover" />
+                              <img src={getProxiedImageUrl(master.photo) || master.photo} alt={master.name} className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-white font-bold text-lg">{master.name?.charAt(0) || '?'}</span>
                             )}
