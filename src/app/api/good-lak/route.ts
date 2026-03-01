@@ -375,6 +375,13 @@ export async function GET(request: NextRequest) {
           result.data.birthDate = convertToISODate(result.data.birthDate);
         }
         break;
+      // Новые endpoints для разработчика
+      case 'getAllServices':
+        result = await fetchFromAppsScript({ action: 'getAllServices' });
+        break;
+      case 'getAllMasters':
+        result = await fetchFromAppsScript({ action: 'getAllMasters' });
+        break;
       default:
         result = { success: false, error: 'Unknown action' };
     }
@@ -494,6 +501,46 @@ export async function POST(request: NextRequest) {
         result = await postToAppsScript({
           action: 'updateAppSettings',
           settings: data.settings,
+        });
+        break;
+      // Услуги
+      case 'addService':
+        result = await postToAppsScript({
+          action: 'addService',
+          service: data.service,
+        });
+        break;
+      case 'updateService':
+        result = await postToAppsScript({
+          action: 'updateService',
+          serviceId: data.serviceId,
+          service: data.service,
+        });
+        break;
+      case 'deleteService':
+        result = await postToAppsScript({
+          action: 'deleteService',
+          serviceId: data.serviceId,
+        });
+        break;
+      // Мастера
+      case 'addMaster':
+        result = await postToAppsScript({
+          action: 'addMaster',
+          master: data.master,
+        });
+        break;
+      case 'updateMasterByAdmin':
+        result = await postToAppsScript({
+          action: 'updateMasterByAdmin',
+          masterId: data.masterId,
+          master: data.master,
+        });
+        break;
+      case 'deleteMaster':
+        result = await postToAppsScript({
+          action: 'deleteMaster',
+          masterId: data.masterId,
         });
         break;
       default:
