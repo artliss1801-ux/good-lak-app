@@ -120,3 +120,107 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ==================== МОБИЛЬНАЯ АДАПТАЦИЯ ==================== */
+
+/* Безопасные зоны для устройств с вырезами (iPhone X и новее) */
+html {
+  height: 100%;
+  /* Предотвращаем увеличение при повороте экрана */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  /* Плавная прокрутка */
+  -webkit-overflow-scrolling: touch;
+  /* Предотвращаем выделение текста при двойном тапе */
+  -webkit-tap-highlight-color: transparent;
+  /* Безопасные зоны */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Адаптация для PWA режима */
+@media all and (display-mode: standalone) {
+  body {
+    /* Учитываем верхнюю безопасную зону для PWA */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Предотвращаем zoom на iOS при фокусе на input с font-size < 16px */
+input, 
+textarea, 
+select {
+  font-size: 16px !important;
+}
+
+/* Улучшенные touch-цели */
+button, 
+[role="button"],
+a,
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Оптимизация для маленьких экранов */
+@media (max-width: 360px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Убираем лишние отступы на очень маленьких экранах */
+@media (max-width: 320px) {
+  .p-4 {
+    padding: 0.75rem;
+  }
+  .p-6 {
+    padding: 1rem;
+  }
+}
+
+/* Фикс для 100vh на мобильных */
+@supports (height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}
+
+/* Скрываем скроллбар на мобильных для более чистого вида */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Анимации только на устройствах с достаточной производительностью */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Улучшение читаемости на AMOLED экранах */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #000;
+  }
+}
