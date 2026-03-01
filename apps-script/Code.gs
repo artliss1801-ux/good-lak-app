@@ -1606,22 +1606,35 @@ function updateScheduleBatch(masterId, schedules) {
 function autoUpdateAllMasterSchedules() {
   const masters = getSheetData(CONFIG.SHEETS.MASTERS);
   
+  console.log('Всего мастеров в таблице:', masters.length);
+  
   // Фильтруем только активных мастеров
   const activeMasters = masters.filter(m => {
     const active = m['Активен'];
-    return active === 1 || active === true || active === '1' || active === 'true' || active === 'Да';
+    const isActive = active === 1 || active === true || active === '1' || active === 'true' || active === 'Да' || active === 'да';
+    console.log('Мастер:', m['Имя'], ', Активен:', active, ', isAcive:', isActive);
+    return isActive;
   });
   
+  console.log('Активных мастеров:', activeMasters.length);
+  
+  if (activeMasters.length === 0) {
+    return 'Нет активных мастеров для обновления графиков';
+  }
+  
+  const results = [];
   activeMasters.forEach(master => {
     try {
-      autoUpdateMasterSchedule(master['ID']);
-      console.log('Обновлён график мастера:', master['Имя']);
+      const result = autoUpdateMasterSchedule(master['ID']);
+      console.log('Результат обновления мастера', master['Имя'], ':', JSON.stringify(result));
+      results.push({ master: master['Имя'], result });
     } catch (e) {
       console.error('Ошибка обновления графика мастера', master['Имя'], ':', e.toString());
+      results.push({ master: master['Имя'], error: e.toString() });
     }
   });
   
-  return 'Графики обновлены для ' + activeMasters.length + ' мастеров';
+  return 'Графики обновлены:\n' + results.map(r => r.master + ': ' + (r.error || 'OK (удалено: ' + r.result.deleted + ', добавлено: ' + r.result.added + ')')).join('\n');
 }
 
 // Автоматическое обновление графика конкретного мастера
@@ -1629,33 +1642,76 @@ function autoUpdateMasterSchedule(masterId) {
   const masters = getSheetData(CONFIG.SHEETS.MASTERS);
   const master = masters.find(m => String(m['ID']) === String(masterId));
   
-  if (!master) return { success: false, error: 'Мастер не найден' };
+  if (!master) {
+    console.log('Мастер не найден для ID:', masterId);
+    return { success: false, error: 'Мастер не найден' };
+  }
   
   const masterName = master['Имя'];
   const telegramId = master['TelegramID'];
-  const scheduleSheetName = `График_${masterName}_${telegramId}`;
   
-  let scheduleSheet = getSheet(scheduleSheetName);
-  if (!scheduleSheet) {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    scheduleSheet = ss.getSheetByName(scheduleSheetName);
-    
-    if (!scheduleSheet) {
-      // Создаём новый лист если не существует
-      scheduleSheet = ss.insertSheet(scheduleSheetName);
-      scheduleSheet.appendRow(['Дата', 'Статус', 'Начало', 'Конец', 'Перерыв_Начало', 'Перерыв_Конец']);
+  console.log('Обновление графика для мастера:', masterName, ', TelegramID:', telegramId);
+  
+  // Ищем лист графика
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const allSheets = ss.getSheets();
+  
+  // Возможные варианты имени листа
+  const possibleNames = [
+    `График_${masterName}_${telegramId}`,
+    `График ${masterName}`,
+    `График_${masterName}`,
+    masterName + '_график'
+  ];
+  
+  console.log('Возможные имена листа:', possibleNames.join(', '));
+  console.log('Все листы:', allSheets.map(s => s.getName()).join(', '));
+  
+  let scheduleSheet = null;
+  
+  // Сначала ищем по точному совпадению
+  for (const name of possibleNames) {
+    scheduleSheet = ss.getSheetByName(name);
+    if (scheduleSheet) {
+      console.log('Найден лист по имени:', name);
+      break;
     }
   }
   
+  // Если не нашли, ищем по частичному совпадению
+  if (!scheduleSheet) {
+    for (const sheet of allSheets) {
+      const sheetName = sheet.getName();
+      if (sheetName.includes('График') && sheetName.includes(masterName)) {
+        scheduleSheet = sheet;
+        console.log('Найден лист по частичному совпадению:', sheetName);
+        break;
+      }
+    }
+  }
+  
+  if (!scheduleSheet) {
+    console.log('Лист графика не найден, создаём новый');
+    scheduleSheet = ss.insertSheet(`График_${masterName}_${telegramId}`);
+    scheduleSheet.appendRow(['Дата', 'Статус', 'Начало', 'Конец', 'Перерыв_Начало', 'Перерыв_Конец']);
+  }
+  
   const data = scheduleSheet.getDataRange().getValues();
+  console.log('Данные графика, строк:', data.length);
+  
+  if (data.length <= 1) {
+    console.log('График пуст, только заголовки');
+  }
+  
   const headers = data[0];
+  console.log('Заголовки:', headers.join(', '));
   
   const dateIdx = headers.indexOf('Дата');
-  const statusIdx = headers.indexOf('Статус');
-  const startIdx = headers.indexOf('Начало');
-  const endIdx = headers.indexOf('Конец');
-  const breakStartIdx = headers.indexOf('Перерыв_Начало');
-  const breakEndIdx = headers.indexOf('Перерыв_Конец');
+  
+  if (dateIdx === -1) {
+    console.log('Колонка "Дата" не найдена!');
+    return { success: false, error: 'Колонка "Дата" не найдена' };
+  }
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1664,9 +1720,13 @@ function autoUpdateMasterSchedule(masterId) {
   const futureDate = new Date(today);
   futureDate.setDate(futureDate.getDate() + 60);
   
+  console.log('Сегодня:', formatDate(today));
+  console.log('Дата через 60 дней:', formatDate(futureDate));
+  
   // Карта существующих дат (строка даты -> индекс строки)
   const existingDates = new Map();
   const rowsToKeep = [];
+  let deletedCount = 0;
   
   // Проходим по всем строкам и определяем, какие оставить
   for (let i = 1; i < data.length; i++) {
@@ -1679,12 +1739,14 @@ function autoUpdateMasterSchedule(masterId) {
     if (dateStr && dateStr.match(/^\d{2}\.\d{2}\.\d{4}$/)) {
       const parts = dateStr.split('.');
       rowDate = new Date(parts[2], parseInt(parts[1]) - 1, parts[0]);
+      rowDate.setHours(0, 0, 0, 0);
     }
     
     if (rowDate) {
       // Прошедшие дни - удаляем
       if (rowDate < today) {
         console.log('Удаляем прошедший день:', dateStr);
+        deletedCount++;
         continue; // Не добавляем в rowsToKeep
       }
       
@@ -1699,6 +1761,10 @@ function autoUpdateMasterSchedule(masterId) {
       // Дни в пределах 60 дней - оставляем
       rowsToKeep.push(row);
       existingDates.set(dateStr, true);
+    } else {
+      // Если не смогли распознать дату, всё равно оставляем строку
+      console.log('Не распознана дата в строке', i, ':', dateValue);
+      rowsToKeep.push(row);
     }
   }
   
@@ -1728,6 +1794,9 @@ function autoUpdateMasterSchedule(masterId) {
     currentAddDate.setDate(currentAddDate.getDate() + 1);
   }
   
+  console.log('Строк для сохранения:', rowsToKeep.length);
+  console.log('Новых дат для добавления:', datesToAdd.length);
+  
   // Очищаем лист и записываем обновлённые данные
   scheduleSheet.clear();
   scheduleSheet.appendRow(headers);
@@ -1742,13 +1811,21 @@ function autoUpdateMasterSchedule(masterId) {
     scheduleSheet.getRange(rowsToKeep.length + 2, 1, datesToAdd.length, headers.length).setValues(datesToAdd);
   }
   
-  console.log('График обновлён: удалено прошедших дней:', data.length - 1 - rowsToKeep.length, ', добавлено новых:', datesToAdd.length);
+  console.log('График обновлён: удалено прошедших дней:', deletedCount, ', добавлено новых:', datesToAdd.length);
   
   return { 
     success: true, 
-    deleted: data.length - 1 - rowsToKeep.length,
-    added: datesToAdd.length
+    deleted: deletedCount,
+    added: datesToAdd.length,
+    kept: rowsToKeep.length
   };
+}
+
+// Тестовая функция для проверки
+function testAutoUpdateSchedule() {
+  const result = autoUpdateAllMasterSchedules();
+  console.log(result);
+  return result;
 }
 
 // ==================== КЛИЕНТЫ ====================
