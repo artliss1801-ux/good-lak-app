@@ -841,7 +841,7 @@ function updateService(serviceId, serviceData) {
   return { success: false, error: 'Услуга не найдена' };
 }
 
-// Удалить услугу (деактивировать)
+// Удалить услугу (полное удаление строки из таблицы)
 function deleteService(serviceId) {
   const sheet = getSheet(CONFIG.SHEETS.SERVICES);
   if (!sheet) return { success: false, error: 'Лист "Услуги" не найден' };
@@ -850,12 +850,11 @@ function deleteService(serviceId) {
   const headers = data[0];
   
   const idIdx = headers.indexOf('ID');
-  const activeIdx = headers.indexOf('Активна');
   
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idIdx]) === String(serviceId)) {
-      data[i][activeIdx] = 0;
-      sheet.getRange(i + 1, activeIdx + 1).setValue(0);
+      // Удаляем строку полностью
+      sheet.deleteRow(i + 1);
       return { success: true };
     }
   }
@@ -989,7 +988,7 @@ function updateMasterByAdmin(masterId, masterData) {
   return { success: false, error: 'Мастер не найден' };
 }
 
-// Удалить мастера (деактивировать)
+// Удалить мастера (полное удаление строки из таблицы)
 function deleteMaster(masterId) {
   const sheet = getSheet(CONFIG.SHEETS.MASTERS);
   if (!sheet) return { success: false, error: 'Лист "Мастера" не найден' };
@@ -998,11 +997,11 @@ function deleteMaster(masterId) {
   const headers = data[0];
   
   const idIdx = headers.indexOf('ID');
-  const activeIdx = headers.indexOf('Активен');
   
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idIdx]) === String(masterId)) {
-      sheet.getRange(i + 1, activeIdx + 1).setValue(0);
+      // Удаляем строку полностью
+      sheet.deleteRow(i + 1);
       return { success: true };
     }
   }
