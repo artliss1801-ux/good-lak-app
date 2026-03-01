@@ -182,8 +182,14 @@ function doGet(e) {
       case 'getMasters':
         result = getMasters();
         break;
+      case 'getAllMasters':
+        result = getAllMasters();
+        break;
       case 'getServices':
         result = getServices();
+        break;
+      case 'getAllServices':
+        result = getAllServices();
         break;
       case 'getMasterSchedule':
         result = getMasterSchedule(e.parameter.masterId);
@@ -306,6 +312,26 @@ function doPost(e) {
         break;
       case 'updateAppSettings':
         result = updateAppSettings(data.settings);
+        break;
+      // Услуги
+      case 'addService':
+        result = addService(data.service);
+        break;
+      case 'updateService':
+        result = updateService(data.serviceId, data.service);
+        break;
+      case 'deleteService':
+        result = deleteService(data.serviceId);
+        break;
+      // Мастера
+      case 'addMaster':
+        result = addMaster(data.master);
+        break;
+      case 'updateMasterByAdmin':
+        result = updateMasterByAdmin(data.masterId, data.master);
+        break;
+      case 'deleteMaster':
+        result = deleteMaster(data.masterId);
         break;
       default:
         result = { success: false, error: 'Unknown action: ' + data.action };
@@ -717,10 +743,238 @@ function getServices() {
       name: s['Название'],
       price: s['Цена'] || 0,
       duration: s['Длительность'] || 60,
-      description: s['Описание'] || ''
+      description: s['Описание'] || '',
+      active: s['Активна'] === 1 || s['Активна'] === true || s['Активна'] === '1' || s['Активна'] === 'true'
     }));
   
   return { success: true, data: services };
+}
+
+// Получить все услуги (включая неактивные) для разработчика
+function getAllServices() {
+  const data = getSheetData(CONFIG.SHEETS.SERVICES);
+  const services = data.map(s => ({
+    id: s['ID'],
+    name: s['Название'],
+    price: s['Цена'] || 0,
+    duration: s['Длительность'] || 60,
+    description: s['Описание'] || '',
+    active: s['Активна'] === 1 || s['Активна'] === true || s['Активна'] === '1' || s['Активна'] === 'true'
+  }));
+  
+  return { success: true, data: services };
+}
+
+// Добавить новую услугу
+function addService(serviceData) {
+  const sheet = getSheet(CONFIG.SHEETS.SERVICES);
+  if (!sheet) return { success: false, error: 'Лист "Услуги" не найден' };
+  
+  const newId = Date.now();
+  
+  sheet.appendRow([
+    newId,
+    serviceData.name,
+    serviceData.price || 0,
+    serviceData.duration || 60,
+    serviceData.description || '',
+    1 // Активна по умолчанию
+  ]);
+  
+  return { 
+    success: true, 
+    data: { 
+      id: newId,
+      name: serviceData.name,
+      price: serviceData.price || 0,
+      duration: serviceData.duration || 60,
+      description: serviceData.description || '',
+      active: true
+    } 
+  };
+}
+
+// Обновить услугу
+function updateService(serviceId, serviceData) {
+  const sheet = getSheet(CONFIG.SHEETS.SERVICES);
+  if (!sheet) return { success: false, error: 'Лист "Услуги" не найден' };
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIdx = headers.indexOf('ID');
+  const nameIdx = headers.indexOf('Название');
+  const priceIdx = headers.indexOf('Цена');
+  const durationIdx = headers.indexOf('Длительность');
+  const descriptionIdx = headers.indexOf('Описание');
+  const activeIdx = headers.indexOf('Активна');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIdx]) === String(serviceId)) {
+      if (serviceData.name !== undefined && nameIdx !== -1) {
+        data[i][nameIdx] = serviceData.name;
+      }
+      if (serviceData.price !== undefined && priceIdx !== -1) {
+        data[i][priceIdx] = serviceData.price;
+      }
+      if (serviceData.duration !== undefined && durationIdx !== -1) {
+        data[i][durationIdx] = serviceData.duration;
+      }
+      if (serviceData.description !== undefined && descriptionIdx !== -1) {
+        data[i][descriptionIdx] = serviceData.description;
+      }
+      if (serviceData.active !== undefined && activeIdx !== -1) {
+        data[i][activeIdx] = serviceData.active ? 1 : 0;
+      }
+      
+      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Услуга не найдена' };
+}
+
+// Удалить услугу (деактивировать)
+function deleteService(serviceId) {
+  const sheet = getSheet(CONFIG.SHEETS.SERVICES);
+  if (!sheet) return { success: false, error: 'Лист "Услуги" не найден' };
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIdx = headers.indexOf('ID');
+  const activeIdx = headers.indexOf('Активна');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIdx]) === String(serviceId)) {
+      data[i][activeIdx] = 0;
+      sheet.getRange(i + 1, activeIdx + 1).setValue(0);
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Услуга не найдена' };
+}
+
+// ==================== МАСТЕРА (для разработчика) ====================
+
+// Получить всех мастеров (полная информация)
+function getAllMasters() {
+  const data = getSheetData(CONFIG.SHEETS.MASTERS);
+  const masters = data.map(m => ({
+    id: m['ID'],
+    name: m['Имя'] || '',
+    photo: m['СсылкаНаФото'] || '',
+    telegramId: m['TelegramID'] || '',
+    login: m['Логин'] || '',
+    password: m['Пароль'] || '',
+    active: m['Активен'] === 1 || m['Активен'] === true || m['Активен'] === '1' || m['Активен'] === 'true',
+    photoScale: m['photoScale'] || 1,
+    photoTranslateX: m['photoTranslateX'] || 0,
+    photoTranslateY: m['photoTranslateY'] || 0
+  }));
+  
+  return { success: true, data: masters };
+}
+
+// Добавить нового мастера
+function addMaster(masterData) {
+  const sheet = getSheet(CONFIG.SHEETS.MASTERS);
+  if (!sheet) return { success: false, error: 'Лист "Мастера" не найден' };
+  
+  const newId = Date.now();
+  
+  sheet.appendRow([
+    newId,
+    masterData.name,
+    masterData.photo || '',
+    masterData.telegramId || '',
+    masterData.login || '',
+    masterData.password || '',
+    1, // Активен по умолчанию
+    1, // photoScale
+    0, // photoTranslateX
+    0  // photoTranslateY
+  ]);
+  
+  return { 
+    success: true, 
+    data: { 
+      id: newId,
+      name: masterData.name,
+      photo: masterData.photo || '',
+      telegramId: masterData.telegramId || '',
+      login: masterData.login || '',
+      active: true
+    } 
+  };
+}
+
+// Обновить мастера (для разработчика)
+function updateMasterByAdmin(masterId, masterData) {
+  const sheet = getSheet(CONFIG.SHEETS.MASTERS);
+  if (!sheet) return { success: false, error: 'Лист "Мастера" не найден' };
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIdx = headers.indexOf('ID');
+  const nameIdx = headers.indexOf('Имя');
+  const photoIdx = headers.indexOf('СсылкаНаФото');
+  const telegramIdx = headers.indexOf('TelegramID');
+  const loginIdx = headers.indexOf('Логин');
+  const passwordIdx = headers.indexOf('Пароль');
+  const activeIdx = headers.indexOf('Активен');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIdx]) === String(masterId)) {
+      if (masterData.name !== undefined && nameIdx !== -1) {
+        data[i][nameIdx] = masterData.name;
+      }
+      if (masterData.photo !== undefined && photoIdx !== -1) {
+        data[i][photoIdx] = masterData.photo;
+      }
+      if (masterData.telegramId !== undefined && telegramIdx !== -1) {
+        data[i][telegramIdx] = masterData.telegramId;
+      }
+      if (masterData.login !== undefined && loginIdx !== -1) {
+        data[i][loginIdx] = masterData.login;
+      }
+      if (masterData.password !== undefined && passwordIdx !== -1) {
+        data[i][passwordIdx] = masterData.password;
+      }
+      if (masterData.active !== undefined && activeIdx !== -1) {
+        data[i][activeIdx] = masterData.active ? 1 : 0;
+      }
+      
+      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Мастер не найден' };
+}
+
+// Удалить мастера (деактивировать)
+function deleteMaster(masterId) {
+  const sheet = getSheet(CONFIG.SHEETS.MASTERS);
+  if (!sheet) return { success: false, error: 'Лист "Мастера" не найден' };
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIdx = headers.indexOf('ID');
+  const activeIdx = headers.indexOf('Активен');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIdx]) === String(masterId)) {
+      sheet.getRange(i + 1, activeIdx + 1).setValue(0);
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Мастер не найден' };
 }
 
 // ==================== ГРАФИК МАСТЕРА ====================
