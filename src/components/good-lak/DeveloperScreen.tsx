@@ -665,6 +665,56 @@ export function DeveloperScreen() {
                             />
                           </div>
                         </div>
+                        <div className="flex items-center justify-between py-3 px-4 bg-gray-700/50 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              editingService.active 
+                                ? 'bg-gradient-to-br from-green-400 to-emerald-600 shadow-lg shadow-green-500/30' 
+                                : 'bg-gradient-to-br from-gray-500 to-gray-600'
+                            }`}>
+                              {editingService.active ? (
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <p className={`font-medium transition-colors duration-300 ${
+                                editingService.active ? 'text-green-400' : 'text-gray-400'
+                              }`}>
+                                {editingService.active ? 'Услуга активна' : 'Услуга неактивна'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {editingService.active ? 'Видна клиентам' : 'Скрыта от клиентов'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingService({ ...editingService, active: !editingService.active })}
+                            className={`relative w-16 h-9 rounded-full transition-all duration-500 ease-out ${
+                              editingService.active 
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 shadow-lg shadow-green-500/40' 
+                                : 'bg-gray-600 shadow-inner'
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-1 w-7 h-7 rounded-full transition-all duration-500 ease-out ${
+                                editingService.active 
+                                  ? 'left-8 bg-white shadow-lg scale-110' 
+                                  : 'left-1 bg-gray-300 shadow-md scale-100'
+                              }`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-between px-2">
+                              <span className={`text-[10px] font-bold transition-opacity duration-300 ${editingService.active ? 'opacity-0' : 'opacity-70 text-gray-400'}`}>OFF</span>
+                              <span className={`text-[10px] font-bold transition-opacity duration-300 ${editingService.active ? 'opacity-100 text-white' : 'opacity-0'}`}>ON</span>
+                            </div>
+                          </button>
+                        </div>
                         <div className="flex gap-2">
                           <Button 
                             onClick={() => handleUpdateService(editingService)}
@@ -833,14 +883,55 @@ export function DeveloperScreen() {
                           onChange={(e) => setEditingMaster({ ...editingMaster, password: e.target.value })}
                           className="bg-gray-700 border-gray-600 text-white"
                         />
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={editingMaster.active}
-                            onChange={(e) => setEditingMaster({ ...editingMaster, active: e.target.checked })}
-                            className="rounded"
-                          />
-                          <span className="text-gray-300 text-sm">Активен</span>
+                        <div className="flex items-center justify-between py-3 px-4 bg-gray-700/50 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              editingMaster.active 
+                                ? 'bg-gradient-to-br from-green-400 to-emerald-600 shadow-lg shadow-green-500/30' 
+                                : 'bg-gradient-to-br from-gray-500 to-gray-600'
+                            }`}>
+                              {editingMaster.active ? (
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <p className={`font-medium transition-colors duration-300 ${
+                                editingMaster.active ? 'text-green-400' : 'text-gray-400'
+                              }`}>
+                                {editingMaster.active ? 'Мастер активен' : 'Мастер неактивен'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {editingMaster.active ? 'Виден клиентам' : 'Скрыт от клиентов'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingMaster({ ...editingMaster, active: !editingMaster.active })}
+                            className={`relative w-16 h-9 rounded-full transition-all duration-500 ease-out ${
+                              editingMaster.active 
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 shadow-lg shadow-green-500/40' 
+                                : 'bg-gray-600 shadow-inner'
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-1 w-7 h-7 rounded-full transition-all duration-500 ease-out ${
+                                editingMaster.active 
+                                  ? 'left-8 bg-white shadow-lg scale-110' 
+                                  : 'left-1 bg-gray-300 shadow-md scale-100'
+                              }`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-between px-2">
+                              <span className={`text-[10px] font-bold transition-opacity duration-300 ${editingMaster.active ? 'opacity-0' : 'opacity-70 text-gray-400'}`}>OFF</span>
+                              <span className={`text-[10px] font-bold transition-opacity duration-300 ${editingMaster.active ? 'opacity-100 text-white' : 'opacity-0'}`}>ON</span>
+                            </div>
+                          </button>
                         </div>
                         <div className="flex gap-2">
                           <Button 
