@@ -1598,6 +1598,159 @@ function updateScheduleBatch(masterId, schedules) {
   return { success: true };
 }
 
+// ==================== АВТОМАТИЧЕСКОЕ УПРАВЛЕНИЕ ГРАФИКОМ ====================
+
+// Автоматическое обновление графиков всех мастеров
+// Удаляет прошедшие дни и добавляет новые (минимум 60 дней вперёд)
+// Не трогает дни, добавленные мастером вручную (> 60 дней от сегодня)
+function autoUpdateAllMasterSchedules() {
+  const masters = getSheetData(CONFIG.SHEETS.MASTERS);
+  
+  // Фильтруем только активных мастеров
+  const activeMasters = masters.filter(m => {
+    const active = m['Активен'];
+    return active === 1 || active === true || active === '1' || active === 'true' || active === 'Да';
+  });
+  
+  activeMasters.forEach(master => {
+    try {
+      autoUpdateMasterSchedule(master['ID']);
+      console.log('Обновлён график мастера:', master['Имя']);
+    } catch (e) {
+      console.error('Ошибка обновления графика мастера', master['Имя'], ':', e.toString());
+    }
+  });
+  
+  return 'Графики обновлены для ' + activeMasters.length + ' мастеров';
+}
+
+// Автоматическое обновление графика конкретного мастера
+function autoUpdateMasterSchedule(masterId) {
+  const masters = getSheetData(CONFIG.SHEETS.MASTERS);
+  const master = masters.find(m => String(m['ID']) === String(masterId));
+  
+  if (!master) return { success: false, error: 'Мастер не найден' };
+  
+  const masterName = master['Имя'];
+  const telegramId = master['TelegramID'];
+  const scheduleSheetName = `График_${masterName}_${telegramId}`;
+  
+  let scheduleSheet = getSheet(scheduleSheetName);
+  if (!scheduleSheet) {
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    scheduleSheet = ss.getSheetByName(scheduleSheetName);
+    
+    if (!scheduleSheet) {
+      // Создаём новый лист если не существует
+      scheduleSheet = ss.insertSheet(scheduleSheetName);
+      scheduleSheet.appendRow(['Дата', 'Статус', 'Начало', 'Конец', 'Перерыв_Начало', 'Перерыв_Конец']);
+    }
+  }
+  
+  const data = scheduleSheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const dateIdx = headers.indexOf('Дата');
+  const statusIdx = headers.indexOf('Статус');
+  const startIdx = headers.indexOf('Начало');
+  const endIdx = headers.indexOf('Конец');
+  const breakStartIdx = headers.indexOf('Перерыв_Начало');
+  const breakEndIdx = headers.indexOf('Перерыв_Конец');
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Дата через 60 дней
+  const futureDate = new Date(today);
+  futureDate.setDate(futureDate.getDate() + 60);
+  
+  // Карта существующих дат (строка даты -> индекс строки)
+  const existingDates = new Map();
+  const rowsToKeep = [];
+  
+  // Проходим по всем строкам и определяем, какие оставить
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const dateValue = row[dateIdx];
+    const dateStr = formatDate(dateValue);
+    
+    // Парсим дату
+    let rowDate = null;
+    if (dateStr && dateStr.match(/^\d{2}\.\d{2}\.\d{4}$/)) {
+      const parts = dateStr.split('.');
+      rowDate = new Date(parts[2], parseInt(parts[1]) - 1, parts[0]);
+    }
+    
+    if (rowDate) {
+      // Прошедшие дни - удаляем
+      if (rowDate < today) {
+        console.log('Удаляем прошедший день:', dateStr);
+        continue; // Не добавляем в rowsToKeep
+      }
+      
+      // Дни > 60 дней от сегодня - оставляем (добавлены мастером вручную)
+      if (rowDate > futureDate) {
+        console.log('Сохраняем день мастера (более 60 дней):', dateStr);
+        rowsToKeep.push(row);
+        existingDates.set(dateStr, true);
+        continue;
+      }
+      
+      // Дни в пределах 60 дней - оставляем
+      rowsToKeep.push(row);
+      existingDates.set(dateStr, true);
+    }
+  }
+  
+  // Определяем, какие даты нужно добавить
+  const datesToAdd = [];
+  const currentAddDate = new Date(today);
+  
+  while (currentAddDate <= futureDate) {
+    const dateStr = formatDate(currentAddDate);
+    
+    if (!existingDates.has(dateStr)) {
+      // Определяем день недели для дефолтного статуса
+      const dayOfWeek = currentAddDate.getDay();
+      // 0 = воскресенье, 6 = суббота
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      
+      datesToAdd.push([
+        dateStr,
+        isWeekend ? 'Выходной' : 'Рабочий',
+        isWeekend ? '' : '09:00',
+        isWeekend ? '' : '19:00',
+        isWeekend ? '' : '13:00',
+        isWeekend ? '' : '14:00'
+      ]);
+    }
+    
+    currentAddDate.setDate(currentAddDate.getDate() + 1);
+  }
+  
+  // Очищаем лист и записываем обновлённые данные
+  scheduleSheet.clear();
+  scheduleSheet.appendRow(headers);
+  
+  // Записываем сохранённые строки
+  if (rowsToKeep.length > 0) {
+    scheduleSheet.getRange(2, 1, rowsToKeep.length, headers.length).setValues(rowsToKeep);
+  }
+  
+  // Записываем новые даты
+  if (datesToAdd.length > 0) {
+    scheduleSheet.getRange(rowsToKeep.length + 2, 1, datesToAdd.length, headers.length).setValues(datesToAdd);
+  }
+  
+  console.log('График обновлён: удалено прошедших дней:', data.length - 1 - rowsToKeep.length, ', добавлено новых:', datesToAdd.length);
+  
+  return { 
+    success: true, 
+    deleted: data.length - 1 - rowsToKeep.length,
+    added: datesToAdd.length
+  };
+}
+
 // ==================== КЛИЕНТЫ ====================
 
 function getMasterClients(masterId) {
@@ -2099,7 +2252,8 @@ function createReminderTriggers() {
     if (trigger.getHandlerFunction() === 'sendMorningReminders' || 
         trigger.getHandlerFunction() === 'sendHourBeforeReminders' ||
         trigger.getHandlerFunction() === 'deleteRegistrationMessages' ||
-        trigger.getHandlerFunction() === 'deletePastAppointmentMessages') {
+        trigger.getHandlerFunction() === 'deletePastAppointmentMessages' ||
+        trigger.getHandlerFunction() === 'autoUpdateAllMasterSchedules') {
       ScriptApp.deleteTrigger(trigger);
     }
   });
@@ -2129,8 +2283,21 @@ function createReminderTriggers() {
     .everyMinutes(10)
     .create();
   
-  console.log('Триггеры напоминаний созданы!');
-  return 'Триггеры созданы: утренние напоминания в 08:00, напоминания за час (каждые 10 минут), удаление сообщений регистрации (каждую минуту), удаление сообщений записей (каждые 10 минут)';
+  // Триггер для автоматического обновления графиков - ежедневно в 00:05
+  ScriptApp.newTrigger('autoUpdateAllMasterSchedules')
+    .timeBased()
+    .atHour(0)
+    .nearMinute(5)
+    .everyDays(1)
+    .create();
+  
+  console.log('Все триггеры созданы!');
+  return 'Триггеры созданы:\n' +
+    '- Утренние напоминания в 08:00\n' +
+    '- Напоминания за час (каждые 10 минут)\n' +
+    '- Удаление сообщений регистрации (каждую минуту)\n' +
+    '- Удаление сообщений записей (каждые 10 минут)\n' +
+    '- Автообновление графиков (ежедневно в 00:05)';
 }
 
 // Удаление всех триггеров
