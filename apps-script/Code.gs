@@ -16,7 +16,8 @@ const CONFIG = {
     USERS: 'Пользователи',
     APPOINTMENTS: 'Записи',
     INCOME_EXPENSES: 'Доходы и расходы',
-    SCHEDULE_PREFIX: 'График_'
+    SCHEDULE_PREFIX: 'График_',
+    TELEGRAM_MESSAGES: 'TelegramMessages'
   },
   
   STATUS: {
@@ -24,6 +25,12 @@ const CONFIG = {
     PENDING: 'Ожидает подтверждения',
     CANCELLED: 'Отменено',
     COMPLETED: 'Завершено'
+  },
+  
+  MESSAGE_TYPES: {
+    REGISTRATION: 'registration',
+    APPOINTMENT: 'appointment',
+    REMINDER: 'reminder'
   }
 };
 
@@ -1674,6 +1681,7 @@ function addFinanceRecord(record) {
 
 // ==================== TELEGRAM ====================
 
+// Отправка сообщения (без сохранения ID)
 function sendTelegramMessage(chatId, text) {
   try {
     const url = `https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -1690,6 +1698,166 @@ function sendTelegramMessage(chatId, text) {
     });
   } catch (e) {
     console.error('Telegram error:', e);
+  }
+}
+
+// Отправка сообщения с возвратом ID сообщения
+function sendTelegramMessageWithId(chatId, text) {
+  try {
+    const url = `https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const payload = {
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML'
+    };
+    
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload)
+    });
+    
+    const result = JSON.parse(response.getContentText());
+    if (result.ok && result.result) {
+      return result.result.message_id;
+    }
+    return null;
+  } catch (e) {
+    console.error('Telegram error:', e);
+    return null;
+  }
+}
+
+// Удаление сообщения
+function deleteTelegramMessage(chatId, messageId) {
+  try {
+    const url = `https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/deleteMessage`;
+    const payload = {
+      chat_id: chatId,
+      message_id: messageId
+    };
+    
+    UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload)
+    });
+    
+    return true;
+  } catch (e) {
+    console.error('Telegram delete error:', e);
+    return false;
+  }
+}
+
+// Сохранение сообщения для последующего удаления
+function saveMessageForDeletion(chatId, messageId, messageType, appointmentId, deleteAfterMinutes) {
+  const sheet = getSheet(CONFIG.SHEETS.TELEGRAM_MESSAGES);
+  if (!sheet) {
+    // Создаём лист если не существует
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const newSheet = ss.insertSheet(CONFIG.SHEETS.TELEGRAM_MESSAGES);
+    newSheet.appendRow(['ID', 'ChatId', 'MessageId', 'MessageType', 'AppointmentId', 'CreatedAt', 'DeleteAt', 'Deleted']);
+  }
+  
+  const messageSheet = getSheet(CONFIG.SHEETS.TELEGRAM_MESSAGES);
+  const now = new Date();
+  const deleteAt = new Date(now.getTime() + (deleteAfterMinutes || 0) * 60000);
+  
+  messageSheet.appendRow([
+    Date.now(),
+    chatId,
+    messageId,
+    messageType,
+    appointmentId || '',
+    now.toISOString(),
+    deleteAt.toISOString(),
+    false
+  ]);
+}
+
+// Удаление всех сообщений регистрации через минуту
+function deleteRegistrationMessages() {
+  const sheet = getSheet(CONFIG.SHEETS.TELEGRAM_MESSAGES);
+  if (!sheet) return;
+  
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  
+  for (let i = data.length - 1; i >= 1; i--) {
+    const row = data[i];
+    const messageType = row[3];
+    const deleted = row[7];
+    
+    if (messageType === CONFIG.MESSAGE_TYPES.REGISTRATION && deleted !== true) {
+      const deleteAt = new Date(row[6]);
+      
+      if (now >= deleteAt) {
+        const chatId = row[1];
+        const messageId = row[2];
+        
+        // Удаляем сообщение
+        deleteTelegramMessage(chatId, messageId);
+        
+        // Помечаем как удалённое
+        sheet.getRange(i + 1, 8).setValue(true);
+      }
+    }
+  }
+}
+
+// Удаление сообщений о прошедших записях
+function deletePastAppointmentMessages() {
+  const sheet = getSheet(CONFIG.SHEETS.TELEGRAM_MESSAGES);
+  if (!sheet) return;
+  
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  const appointments = getSheetData(CONFIG.SHEETS.APPOINTMENTS);
+  
+  for (let i = data.length - 1; i >= 1; i--) {
+    const row = data[i];
+    const messageType = row[3];
+    const appointmentId = row[4];
+    const deleted = row[7];
+    
+    if (messageType === CONFIG.MESSAGE_TYPES.APPOINTMENT && appointmentId && deleted !== true) {
+      // Находим запись
+      const appointment = appointments.find(a => String(a['ID']) === String(appointmentId));
+      
+      if (appointment) {
+        const aptDate = formatDate(appointment['Дата']);
+        const aptTime = formatTime(appointment['Время']);
+        
+        // Парсим дату и время записи
+        const dateParts = aptDate.split('.');
+        const timeParts = aptTime.split(':');
+        
+        if (dateParts.length === 3 && timeParts.length >= 2) {
+          const appointmentDateTime = new Date(
+            parseInt(dateParts[2]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[0]),
+            parseInt(timeParts[0]),
+            parseInt(timeParts[1])
+          );
+          
+          // Добавляем 1 час после записи для удаления
+          const deleteTime = new Date(appointmentDateTime.getTime() + 60 * 60000);
+          
+          if (now >= deleteTime) {
+            const chatId = row[1];
+            const messageId = row[2];
+            
+            // Удаляем сообщение
+            deleteTelegramMessage(chatId, messageId);
+            
+            // Помечаем как удалённое
+            sheet.getRange(i + 1, 8).setValue(true);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -1713,9 +1881,9 @@ function sendAppointmentNotifications(appointmentId, appointmentData, service) {
     }
   }
   
-  // Уведомление КЛИЕНТУ
+  // Уведомление КЛИЕНТУ с сохранением ID для удаления
   if (clientTelegramId && master) {
-    sendTelegramMessage(clientTelegramId, `
+    const clientMessageId = sendTelegramMessageWithId(clientTelegramId, `
 ✅ <b>Запись подтверждена!</b>
 
 👩‍🎨 Мастер: ${master['Имя']}
@@ -1726,11 +1894,16 @@ function sendAppointmentNotifications(appointmentId, appointmentData, service) {
 
 До встречи в GOOD Лак!
     `);
+    
+    // Сохраняем сообщение для удаления после прошедшей записи
+    if (clientMessageId) {
+      saveMessageForDeletion(clientTelegramId, clientMessageId, CONFIG.MESSAGE_TYPES.APPOINTMENT, appointmentId, 0);
+    }
   }
   
-  // Уведомление МАСТЕРУ
+  // Уведомление МАСТЕРУ с сохранением ID для удаления
   if (master && master['TelegramID']) {
-    sendTelegramMessage(master['TelegramID'], `
+    const masterMessageId = sendTelegramMessageWithId(master['TelegramID'], `
 📅 <b>Новая запись!</b>
 
 👤 Клиент: ${clientInfo}
@@ -1740,6 +1913,11 @@ function sendAppointmentNotifications(appointmentId, appointmentData, service) {
 📆 ${formattedDate}
 ⏰ Время: ${appointmentData.time}
     `);
+    
+    // Сохраняем сообщение для удаления после прошедшей записи
+    if (masterMessageId) {
+      saveMessageForDeletion(master['TelegramID'], masterMessageId, CONFIG.MESSAGE_TYPES.APPOINTMENT, appointmentId, 0);
+    }
   }
 }
 
@@ -1751,13 +1929,23 @@ function handleTelegramUpdate(update) {
   
   // Простая проверка команды
   if (text === '/start') {
-    sendTelegramMessage(chatId, `
+    // Удаляем сообщение пользователя
+    const userMessageId = update.message.message_id;
+    deleteTelegramMessage(chatId, userMessageId);
+    
+    // Отправляем сообщение с сохранением ID для удаления через 1 минуту
+    const messageId = sendTelegramMessageWithId(chatId, `
 👋 Добро пожаловать в GOOD Лак!
 
 Для записи на маникюр используйте наше приложение.
 
 Ваш Telegram ID: ${chatId}
     `);
+    
+    // Сохраняем сообщение регистрации для удаления через 1 минуту
+    if (messageId) {
+      saveMessageForDeletion(chatId, messageId, CONFIG.MESSAGE_TYPES.REGISTRATION, null, 1);
+    }
   }
 }
 
@@ -1909,7 +2097,9 @@ function createReminderTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(trigger => {
     if (trigger.getHandlerFunction() === 'sendMorningReminders' || 
-        trigger.getHandlerFunction() === 'sendHourBeforeReminders') {
+        trigger.getHandlerFunction() === 'sendHourBeforeReminders' ||
+        trigger.getHandlerFunction() === 'deleteRegistrationMessages' ||
+        trigger.getHandlerFunction() === 'deletePastAppointmentMessages') {
       ScriptApp.deleteTrigger(trigger);
     }
   });
@@ -1927,8 +2117,20 @@ function createReminderTriggers() {
     .everyMinutes(10)
     .create();
   
+  // Триггер для удаления сообщений регистрации - каждую минуту
+  ScriptApp.newTrigger('deleteRegistrationMessages')
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+  
+  // Триггер для удаления сообщений о прошедших записях - каждые 10 минут
+  ScriptApp.newTrigger('deletePastAppointmentMessages')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  
   console.log('Триггеры напоминаний созданы!');
-  return 'Триггеры созданы: утренние напоминания в 08:00 и напоминания за час (каждые 10 минут)';
+  return 'Триггеры созданы: утренние напоминания в 08:00, напоминания за час (каждые 10 минут), удаление сообщений регистрации (каждую минуту), удаление сообщений записей (каждые 10 минут)';
 }
 
 // Удаление всех триггеров
