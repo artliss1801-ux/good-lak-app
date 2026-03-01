@@ -1801,9 +1801,20 @@ function autoUpdateMasterSchedule(masterId) {
   scheduleSheet.clear();
   scheduleSheet.appendRow(headers);
   
-  // Записываем сохранённые строки
+  // Записываем сохранённые строки с правильным форматированием времени
   if (rowsToKeep.length > 0) {
-    scheduleSheet.getRange(2, 1, rowsToKeep.length, headers.length).setValues(rowsToKeep);
+    // Форматируем время в строках чтобы избежать даты 30.12.1899
+    const formattedRows = rowsToKeep.map(row => {
+      const newRow = [...row];
+      // Форматируем колонки времени (индексы 2, 3, 4, 5 - Начало, Конец, Перерыв_Начало, Перерыв_Конец)
+      for (let idx = 2; idx <= 5; idx++) {
+        if (newRow[idx]) {
+          newRow[idx] = formatTime(newRow[idx]);
+        }
+      }
+      return newRow;
+    });
+    scheduleSheet.getRange(2, 1, formattedRows.length, headers.length).setValues(formattedRows);
   }
   
   // Записываем новые даты
