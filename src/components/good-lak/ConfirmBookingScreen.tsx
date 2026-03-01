@@ -8,6 +8,38 @@ import { useGoodLakStore } from '@/store/good-lak-store';
 import { format, parse } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
+// Извлечение ID файла из Google Drive URL
+function extractGoogleDriveFileId(url: string | undefined): string | null {
+  if (!url) return null;
+
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+    /open\?id=([a-zA-Z0-9_-]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+
+  return null;
+}
+
+// Получение проксированной ссылки на изображение (обходит CORS)
+function getProxiedImageUrl(url: string | undefined): string | null {
+  if (!url) return null;
+
+  const fileId = extractGoogleDriveFileId(url);
+  if (fileId) {
+    return `/api/image-proxy?id=${fileId}`;
+  }
+
+  // Если это не Google Drive URL, возвращаем как есть
+  return url;
+}
+
 export function ConfirmBookingScreen() {
   const { 
     booking, 
@@ -123,15 +155,20 @@ export function ConfirmBookingScreen() {
             <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl">
               {booking.selectedMaster?.photo ? (
                 <img 
-                  src={booking.selectedMaster.photo} 
+                  src={getProxiedImageUrl(booking.selectedMaster.photo) || booking.selectedMaster.photo} 
                   alt={booking.selectedMaster.name}
                   className="h-14 w-14 rounded-full object-cover border-2 border-pink-300"
+                  onError={(e) => {
+                    console.log('Failed to load master photo:', booking.selectedMaster?.photo);
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling;
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
                 />
-              ) : (
-                <div className="h-14 w-14 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 flex items-center justify-center">
-                  <User className="h-7 w-7 text-white" />
-                </div>
-              )}
+              ) : null}
+              <div className={`h-14 w-14 rounded-full bg-gradient-to-r from-pink-500 to-cyan-500 flex items-center justify-center ${booking.selectedMaster?.photo ? 'hidden' : ''}`}>
+                <User className="h-7 w-7 text-white" />
+              </div>
               <div>
                 <p className="text-sm text-gray-500">Мастер</p>
                 <p className="font-semibold text-gray-800">{booking.selectedMaster?.name}</p>
