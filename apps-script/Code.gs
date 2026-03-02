@@ -2165,15 +2165,25 @@ function addClient(client) {
   const existing = data.find(u => normalizePhone(u['Телефон']) === normalizedPhone);
   
   if (existing) {
-    return { success: true, data: { id: existing['ID'], name: existing['Имя'], phone: existing['Телефон'], totalVisits: 0 } };
+    // Если клиент существует, обновляем его TelegramId если передан masterTelegramId
+    if (client.masterTelegramId && !existing['TelegramId']) {
+      const headers = Object.keys(data[0] || {});
+      const tgIdx = Object.keys(existing).findIndex(k => k === 'TelegramId' || k === 'telegramId');
+      if (tgIdx !== -1) {
+        const rowIdx = data.findIndex(u => String(u['ID']) === String(existing['ID'])) + 2;
+        sheet.getRange(rowIdx, tgIdx + 1).setValue(client.masterTelegramId);
+      }
+    }
+    return { success: true, data: { id: existing['ID'], name: existing['Имя'], phone: existing['Телефон'], totalVisits: 0, telegramId: existing['TelegramId'] || client.masterTelegramId } };
   }
   
+  // Создаём нового клиента с Telegram ID мастера
   const newId = generateId();
   sheet.appendRow([
     newId,
     client.name,
     client.phone,
-    '',
+    client.masterTelegramId || '',  // TelegramId - присваиваем ID мастера
     'Добавлен мастером',
     0,
     '',
@@ -2181,7 +2191,7 @@ function addClient(client) {
     ''
   ]);
   
-  return { success: true, data: { id: newId, name: client.name, phone: client.phone, totalVisits: 0 } };
+  return { success: true, data: { id: newId, name: client.name, phone: client.phone, totalVisits: 0, telegramId: client.masterTelegramId } };
 }
 
 // ==================== РАСХОДЫ ====================
@@ -2397,14 +2407,42 @@ function sendAppointmentNotifications(appointmentId, appointmentData, service) {
   
   const formattedDate = formatDateRussian(appointmentData.date);
   
-  // Получаем информацию о клиенте если есть userId
+  // Получаем информацию о клиенте и его Telegram ID
   let clientInfo = 'Не указан';
   let clientTelegramId = null;
+  
+  // Сначала ищем по userId если есть
   if (appointmentData.userId) {
     const user = users.find(u => String(u['ID']) === String(appointmentData.userId));
     if (user) {
       clientInfo = user['Имя'] || 'Из приложения';
       clientTelegramId = user['TelegramId'];
+    }
+  }
+  
+  // Если не нашли по userId, ищем по номеру телефона
+  if (!clientTelegramId && appointmentData.phone) {
+    const normalizedPhone = normalizePhone(appointmentData.phone);
+    const userByPhone = users.find(u => normalizePhone(u['Телефон']) === normalizedPhone);
+    if (userByPhone) {
+      clientInfo = userByPhone['Имя'] || clientInfo;
+      clientTelegramId = userByPhone['TelegramId'];
+      
+      // Если нашли клиента по телефону, обновляем userId в записи
+      if (userByPhone['ID']) {
+        const aptSheet = getSheet(CONFIG.SHEETS.APPOINTMENTS);
+        const aptData = aptSheet.getDataRange().getValues();
+        const aptHeaders = aptData[0];
+        const userIdIdx = aptHeaders.indexOf('ID_Пользователя');
+        const aptIdIdx = aptHeaders.indexOf('ID');
+        
+        for (let i = 1; i < aptData.length; i++) {
+          if (String(aptData[i][aptIdIdx]) === String(appointmentId)) {
+            aptSheet.getRange(i + 1, userIdIdx + 1).setValue(userByPhone['ID']);
+            break;
+          }
+        }
+      }
     }
   }
   
