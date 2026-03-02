@@ -771,7 +771,10 @@ export function MasterClientsScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'addClient',
-          client: newClient
+          client: {
+            ...newClient,
+            masterTelegramId: master?.telegramId // Передаём Telegram ID мастера
+          }
         })
       });
       const data = await response.json();
